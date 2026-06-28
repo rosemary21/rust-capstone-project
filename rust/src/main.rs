@@ -16,9 +16,6 @@ fn auth() -> Auth {
     Auth::UserPass(RPC_USER.to_owned(), RPC_PASS.to_owned())
 }
 
-// You can use calls not provided in RPC lib API using the generic `call` function.
-// An example of using the `send` RPC call, which doesn't have exposed API.
-// You can also use serde_json `Deserialize` derivation to capture the returned json result.
 fn send(rpc: &Client, addr: &str) -> bitcoincore_rpc::Result<String> {
     let args = [
         json!([{addr : 100 }]), // recipient address
@@ -77,16 +74,6 @@ fn main() -> bitcoincore_rpc::Result<()> {
     let miner_rpc = wallet_client("Miner")?;
     let trader_rpc = wallet_client("Trader")?;
 
-    // Generate spendable balances in the Miner wallet. How many blocks needs to be mined?
-    //
-    // Generate a Miner address labeled "Mining Reward" and mine 101 blocks to it.
-    //
-    // Why 101 blocks? Coinbase outputs (block rewards) are subject to the
-    // "coinbase maturity" rule: they cannot be spent until the block that
-    // contains them has at least 100 confirmations. This rule has been enforced
-    // since Bitcoin's genesis to prevent chain-reorganisation double-spends of
-    // newly minted coins. Mining 101 blocks means the very first coinbase has
-    // exactly 100 confirmations and is now spendable, giving Miner 50 BTC.
     let mining_addr = miner_rpc
         .get_new_address(Some("Mining Reward"), None)?
         .require_network(Network::Regtest)
@@ -119,10 +106,8 @@ fn main() -> bitcoincore_rpc::Result<()> {
     println!("Sent 20 BTC. txid={}", txid);
 
     // Check transaction in mempool
-    let mempool_entry = rpc.call::<serde_json::Value>(
-        "getmempoolentry",
-        &[json!(txid.to_string())],
-    )?;
+    let mempool_entry =
+        rpc.call::<serde_json::Value>("getmempoolentry", &[json!(txid.to_string())])?;
     println!(
         "Mempool entry:\n{}",
         serde_json::to_string_pretty(&mempool_entry).unwrap()
@@ -144,9 +129,6 @@ fn main() -> bitcoincore_rpc::Result<()> {
     // Decode the full transaction to inspect its inputs and outputs
     let raw_tx = rpc.get_raw_transaction_info(&txid, Some(&block_hash))?;
 
-    // Resolve the input UTXO by looking up the previous output being spent.
-    // txindex=1 is enabled in both local bitcoin.conf and the CI docker image,
-    // so getrawtransaction works for any txid without needing the block hash.
     let vin0 = &raw_tx.vin[0];
     let prev_txid = vin0.txid.expect("vin should reference a previous tx");
     let prev_vout_idx = vin0.vout.expect("vin should have a vout index") as usize;
